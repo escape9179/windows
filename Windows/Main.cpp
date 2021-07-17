@@ -1,27 +1,69 @@
-#include <cstdio>
-#include <Windows.h>
+#include <windows.h>
 
-int CDECL MessageBoxPrintf(TCHAR const *szCaption, TCHAR const *szFormat, ...);
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdshow) {
-	int cxScreen, cyScreen;
-	cxScreen = GetSystemMetrics(SM_CXSCREEN);
-	cyScreen = GetSystemMetrics(SM_CYSCREEN);
-	MessageBoxPrintf(TEXT("Screen Size"), TEXT("The screen size is %i pixels wide by %i pixels high."), cxScreen, cyScreen);
-	return 0;
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow) {
+	static wchar_t szAppName[] = L"HelloWin";
+	HWND hwnd;
+	MSG msg;
+	WNDCLASS wndclass;
+
+	wndclass.style = CS_HREDRAW | CS_VREDRAW;
+	wndclass.lpfnWndProc = WndProc;
+	wndclass.cbClsExtra = 0;
+	wndclass.cbWndExtra = 0;
+	wndclass.hInstance = hInstance;
+	wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+	wndclass.lpszMenuName = NULL;
+	wndclass.lpszClassName = szAppName;
+
+	if (!RegisterClass(&wndclass)) {
+		MessageBox(NULL, L"This program requires Windows NT!", szAppName, MB_ICONERROR);
+		return 0;
+	}
+
+	hwnd = CreateWindow(szAppName, // window class name
+		L"The Hello Program", // window caption
+		WS_OVERLAPPEDWINDOW, // window style
+		CW_USEDEFAULT, // initial x position
+		CW_USEDEFAULT, // initial y position
+		CW_USEDEFAULT, // initial x size
+		CW_USEDEFAULT, // initial y size
+		NULL, // parent window handle
+		NULL, // window menu handle
+		hInstance, // program instance handle
+		NULL); // creation parameters
+
+	ShowWindow(hwnd, iCmdShow);
+	UpdateWindow(hwnd);
+
+	while(GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+	}
+	return msg.wParam;
 }
 
-int CDECL MessageBoxPrintf(TCHAR const *szCaption, TCHAR const *szFormat, ...) {
-	va_list args;
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+	HDC hdc;
+	PAINTSTRUCT ps;
+	RECT rect;
 
-	// args = (char *) &szFormat + sizeof(szFormat)
-	va_start(args, szFormat);
-	wchar_t buffer[128];
-
-	// Last argument points to argument list
-	_vsnwprintf_s(buffer, sizeof(buffer) / sizeof(wchar_t), szFormat, args);
-
-	// Zeroes out args for no good reason
-	va_end(args);
-	return MessageBox(NULL, buffer, szCaption, MB_OK | MB_ICONEXCLAMATION);
+	switch(message) {
+	case WM_CREATE:
+		PlaySound(L"hellowin.wav", NULL, SND_FILENAME | SND_ASYNC);
+		return 0;
+	case WM_PAINT:
+		hdc = BeginPaint(hwnd, &ps);
+		GetClientRect(hwnd, &rect);
+		DrawText(hdc, L"Hello, Windows 98!", -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+		EndPaint(hwnd, &ps);
+		return 0;
+	case WM_DESTROY:
+		PostQuitMessage(0);
+		return 0;
+	}
+	return DefWindowProc(hwnd, message, wParam, lParam);
 }
