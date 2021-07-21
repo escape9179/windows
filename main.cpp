@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <cstdio>
 
 LRESULT CALLBACK windowProcedure(HWND windowHandle, UINT messageId, WPARAM wParam, LPARAM lParam);
 
@@ -38,8 +39,16 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR command
     ShowWindow(windowHandle, showCommand);
     UpdateWindow(windowHandle);
 
+    HDC dc = GetDC(windowHandle);
+    TEXTMETRIC textMetrics;
+    GetTextMetrics(dc, &textMetrics);
+    TCHAR buffer[1024];
+    sprintf_s(buffer, sizeof(buffer) / sizeof(TCHAR), "tmHeight: %i, tmAscent: %i", textMetrics.tmHeight, textMetrics.tmAscent);
+    MessageBox(windowHandle, buffer, TEXT("Textmetric info"), MB_OK | MB_ICONINFORMATION);
+    ReleaseDC(windowHandle, dc);
+
     MSG message;
-    while (GetMessage(&message, windowHandle, 0, 0)) {
+    while (GetMessage(&message, NULL, 0, 0)) {
         TranslateMessage(&message);
         DispatchMessage(&message);
     }
