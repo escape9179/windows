@@ -1,79 +1,84 @@
 #include <Windows.h>
-#include <cstdio>
+#include "SystemMetrics.h"
 
-LRESULT CALLBACK windowProcedure(HWND windowHandle, UINT messageId, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
-int WINAPI WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int showCommand) {
-    LPSTR appName = "Application Name";
-    WNDCLASS windowClass;
-    windowClass.style = CS_HREDRAW | CS_VREDRAW;
-    windowClass.lpfnWndProc = windowProcedure;
-    windowClass.cbClsExtra = 0;
-    windowClass.cbWndExtra = 0;
-    windowClass.hInstance = instance;
-    windowClass.hIcon = LoadIcon(instance, IDI_APPLICATION);
-    windowClass.hCursor = LoadCursor(instance, IDC_ARROW);
-    windowClass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-    windowClass.lpszMenuName = NULL;
-    windowClass.lpszClassName = appName;
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow) {
+    static TCHAR szAppName[] = TEXT("SysMets1");
+    HWND hwnd;
+    MSG msg;
+    WNDCLASS wndclass;
 
-    if (!RegisterClass(&windowClass)) {
-        MessageBox(NULL, TEXT("Error registering window class"), TEXT("Error"), MB_OK | MB_ICONERROR);
+    wndclass.style = CS_HREDRAW | CS_VREDRAW;
+    wndclass.lpfnWndProc = WndProc;
+    wndclass.cbClsExtra = 0;
+    wndclass.cbWndExtra = 0;
+    wndclass.hInstance = hInstance;
+    wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+    wndclass.lpszMenuName = NULL;
+    wndclass.lpszClassName = szAppName;
+
+    if (!RegisterClass(&wndclass)) {
+        MessageBox(NULL, TEXT("This program requires Windows NT!"), szAppName, MB_ICONERROR);
         return 0;
     }
 
-    HWND windowHandle = CreateWindow(
-            appName,
-            TEXT("This is a window name"),
+    hwnd = CreateWindow(
+            szAppName,
+            TEXT("Get System Metrics No. 1"),
             WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            NULL,
-            NULL,
-            instance,
-            NULL
+            CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+            NULL, NULL, hInstance, NULL
     );
 
-    ShowWindow(windowHandle, showCommand);
-    UpdateWindow(windowHandle);
+    ShowWindow(hwnd, iCmdShow);
+    UpdateWindow(hwnd);
 
-    HDC dc = GetDC(windowHandle);
-    TEXTMETRIC textMetrics;
-    GetTextMetrics(dc, &textMetrics);
-    TCHAR buffer[1024];
-    sprintf_s(buffer, sizeof(buffer) / sizeof(TCHAR), "tmHeight: %i, tmAscent: %i", textMetrics.tmHeight, textMetrics.tmAscent);
-    MessageBox(windowHandle, buffer, TEXT("Textmetric info"), MB_OK | MB_ICONINFORMATION);
-    ReleaseDC(windowHandle, dc);
-
-    MSG message;
-    while (GetMessage(&message, NULL, 0, 0)) {
-        TranslateMessage(&message);
-        DispatchMessage(&message);
+    while (GetMessage(&msg, hwnd, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
-    return message.wParam;
+    return msg.wParam;
 }
 
-LRESULT CALLBACK windowProcedure(HWND windowHandle, UINT messageId, WPARAM wParam, LPARAM lParam) {
-    HDC deviceContext;
-    PAINTSTRUCT paintStruct;
-    RECT clientRect;
-    switch (messageId) {
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    static int cxChar, cxCaps, cyChar;
+    HDC hdc;
+    int i;
+    PAINTSTRUCT ps;
+    TCHAR szBuffer[10];
+    TEXTMETRIC tm;
+
+    switch (message) {
         case WM_CREATE:
-            // Do nothing
+            hdc = GetDC(hwnd);
+
+            GetTextMetrics(hdc, &tm);
+            cxChar = tm.tmAveCharWidth;
+            cxCaps = (tm.tmPitchAndFamily & 1 ? 3 : 2) * cxChar / 2;
+            cyChar = tm.tmHeight + tm.tmExternalLeading;
+
+            ReleaseDC(hwnd, hdc);
             return 0;
         case WM_PAINT:
-            deviceContext = BeginPaint(windowHandle, &paintStruct);
-            GetClientRect(windowHandle, &clientRect);
-            DrawText(deviceContext, TEXT("This is in the center of the screen"), -1, &clientRect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
-            EndPaint(windowHandle, &paintStruct);
+            hdc = BeginPaint(hwnd, &ps);
+
+            for (i = 0; i < NUMLINES; i++) {
+                TextOut(hdc, 0, cyChar * i, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
+                TextOut(hdc, 22 * cxCaps, cyChar * i, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
+                SetTextAlign(hdc, TA_RIGHT | TA_TOP);
+                TextOut(hdc, 22 * cxCaps + 40 * cxChar, cyChar * i, szBuffer, wsprintf(szBuffer, TEXT("%5d"), GetSystemMetrics(sysmetrics[i].iIndex)));
+                SetTextAlign(hdc, TA_LEFT | TA_TOP);
+            }
+            EndPaint(hwnd, &ps);
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
         default:
-            return DefWindowProc(windowHandle, messageId, wParam, lParam);
+            return DefWindowProc(hwnd, message, wParam, lParam);
     }
 }
