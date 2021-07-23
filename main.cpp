@@ -48,7 +48,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     static int cxChar, cxCaps, cyChar, iVscrollPos;
     HDC hdc;
-    int i, strLength;
+    int i, y;
     PAINTSTRUCT ps;
     TCHAR szBuffer[10];
     TEXTMETRIC tm;
@@ -65,7 +65,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
             ReleaseDC(hwnd, hdc);
 
-            SetScrollRange(hwnd, SB_VERT, 0, NUMLINES, FALSE);
+            SetScrollRange(hwnd, SB_VERT, 0, NUMLINES - 1, FALSE);
             SetScrollPos(hwnd, SB_VERT, iVscrollPos, TRUE);
             break;
         case WM_SIZE:
@@ -104,10 +104,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_PAINT:
             hdc = BeginPaint(hwnd, &ps);
             for (i = 0; i < NUMLINES; i++) {
-                TextOut(hdc, 0, cyChar * i, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
-                TextOut(hdc, 22 * cxCaps, cyChar * i, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
+                y = cyChar * (i - iVscrollPos);
+                TextOut(hdc, 0, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
+                TextOut(hdc, 22 * cxCaps, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
                 SetTextAlign(hdc, TA_RIGHT | TA_TOP);
-                TextOut(hdc, 22 * cxCaps + 40 * cxChar, cyChar * i, szBuffer,
+                TextOut(hdc, 22 * cxCaps + 40 * cxChar, y, szBuffer,
                         wsprintf(szBuffer, TEXT("%5d"), GetSystemMetrics(sysmetrics[i].iIndex)));
                 SetTextAlign(hdc, TA_LEFT | TA_TOP);
             }
