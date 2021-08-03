@@ -1,124 +1,213 @@
 #include <Windows.h>
-#include "SystemMetrics.h"
 #include <cstdio>
+#include "SystemMetrics.h"
 
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK windowProcedure(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam);
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow) {
-    static TCHAR szAppName[] = TEXT("SysMets1");
-    HWND hwnd;
-    MSG msg;
-    WNDCLASS wndclass;
+int WINAPI WinMain(HINSTANCE instance, HINSTANCE previousInstance, LPSTR commandLine, int commandShow) {
+    LPSTR appName = "App Name";
 
-    wndclass.style = CS_HREDRAW | CS_VREDRAW;
-    wndclass.lpfnWndProc = WndProc;
-    wndclass.cbClsExtra = 0;
-    wndclass.cbWndExtra = 0;
-    wndclass.hInstance = hInstance;
-    wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-    wndclass.lpszMenuName = NULL;
-    wndclass.lpszClassName = szAppName;
+    WNDCLASS windowClass;
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = windowProcedure;
+    windowClass.cbClsExtra = 0;
+    windowClass.cbWndExtra = 0;
+    windowClass.hInstance = instance;
+    windowClass.hIcon = LoadIcon(instance, IDI_APPLICATION);
+    windowClass.hCursor = LoadCursor(instance, IDC_ARROW);
+    windowClass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+    windowClass.lpszMenuName = NULL;
+    windowClass.lpszClassName = appName;
 
-    if (!RegisterClass(&wndclass)) {
-        MessageBox(NULL, TEXT("This program requires Windows NT!"), szAppName, MB_ICONERROR);
+    if (!RegisterClass(&windowClass)) {
+        MessageBox(NULL, TEXT("Error registering class"), TEXT("Error"), MB_OK | MB_ICONERROR);
         return 0;
     }
 
-    hwnd = CreateWindow(
-            szAppName,
-            TEXT("Get System Metrics No. 1"),
-            WS_OVERLAPPEDWINDOW | WS_VSCROLL,
+    HWND windowHandle = CreateWindow(
+            appName, TEXT("Window Name"), WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_HSCROLL,
             CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-            NULL, NULL, hInstance, NULL
+            NULL, NULL, instance, NULL
     );
 
-    ShowWindow(hwnd, iCmdShow);
-    UpdateWindow(hwnd);
+    ShowWindow(windowHandle, commandShow);
+    UpdateWindow(windowHandle);
 
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    MSG message;
+    while (GetMessage(&message, NULL, 0, 0)) {
+        TranslateMessage(&message);
+        DispatchMessage(&message);
     }
 
-    return msg.wParam;
+    return message.wParam;
 }
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    static int cxChar, cxCaps, cyChar, iVscrollPos;
-    HDC hdc;
-    int i, y;
-    PAINTSTRUCT ps;
-    TCHAR szBuffer[10];
-    TEXTMETRIC tm;
-    USHORT cxClient, cyClient;
-
+LRESULT CALLBACK windowProcedure(HWND windowHandle, UINT message, WPARAM wParam, LPARAM lParam) {
+    HDC deviceContext;
+    PAINTSTRUCT paintStruct;
+    RECT clientRect;
+    TEXTMETRIC textMetrics;
+    SCROLLINFO scrollInfo;
+    TCHAR buffer[10];
+    static int charWidth;
+    static int charWidthCaps;
+    static int charHeight;
+    static int maxWidth;
+    static int clientWidth;
+    static int clientHeight;
+    int vertScrollbarPos;
+    int horzScrollbarPos;
+    int paintBegin;
+    int paintEnd;
+    int i;
+    int x;
+    int y;
     switch (message) {
         case WM_CREATE:
-            hdc = GetDC(hwnd);
-
-            GetTextMetrics(hdc, &tm);
-            cxChar = tm.tmAveCharWidth;
-            cxCaps = (tm.tmPitchAndFamily & 1 ? 3 : 2) * cxChar / 2;
-            cyChar = tm.tmHeight + tm.tmExternalLeading;
-
-            ReleaseDC(hwnd, hdc);
-
-            SetScrollRange(hwnd, SB_VERT, 0, NUMLINES - 1, FALSE);
-            SetScrollPos(hwnd, SB_VERT, iVscrollPos, TRUE);
+            deviceContext = GetDC(windowHandle);
+            GetTextMetrics(deviceContext, &textMetrics);
+            charWidth = textMetrics.tmAveCharWidth;
+            charWidthCaps = (textMetrics.tmPitchAndFamily & 1 ? 3 : 2) * charWidth / 2;
+            charHeight = textMetrics.tmHeight + textMetrics.tmExternalLeading;
+            ReleaseDC(windowHandle, deviceContext);
+            maxWidth = 40 * charWidth + 22 * charWidthCaps; //TODO Why are we saving the width of the three columns?
             break;
         case WM_SIZE:
-            cxClient = LOWORD(lParam);
-            cyClient = HIWORD(lParam);
+            clientWidth = LOWORD(lParam);
+            clientHeight = HIWORD(lParam);
+
+            // Set vertical scrollbar range and page size
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_RANGE | SIF_PAGE;
+            scrollInfo.nMin = 0;
+            scrollInfo.nMax = NUMLINES - 1;
+            scrollInfo.nPage = clientHeight / charHeight;
+            SetScrollInfo(windowHandle, SB_VERT, &scrollInfo, TRUE);
+
+            // Set horizontal scrollbar range and page size
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_RANGE | SIF_PAGE;
+            scrollInfo.nMin = 0;
+            scrollInfo.nMax = 2 + maxWidth / charWidth; //TODO What is this doing?
+            scrollInfo.nPage = clientWidth / charWidth;
+            SetScrollInfo(windowHandle, SB_HORZ, &scrollInfo, TRUE);
             break;
         case WM_VSCROLL:
+            // Get all the vertical scrollbar information
+            scrollInfo.cbSize = sizeof(SCROLLBARINFO);
+            scrollInfo.fMask = SIF_ALL;
+            GetScrollInfo(windowHandle, SB_VERT, &scrollInfo);
+
+            vertScrollbarPos = scrollInfo.nPos;
+
             switch (LOWORD(wParam)) {
+                case SB_TOP:
+                    scrollInfo.nPos = scrollInfo.nMin;
+                    break;
+                case SB_BOTTOM:
+                    scrollInfo.nPos = scrollInfo.nMax;
+                    break;
                 case SB_LINEUP:
-                    iVscrollPos -= 1;
+                    scrollInfo.nPos -= 1;
                     break;
                 case SB_LINEDOWN:
-                    iVscrollPos += 1;
+                    scrollInfo.nPos += 1;
                     break;
                 case SB_PAGEUP:
-                    iVscrollPos -= cyClient / cyChar;
+                    scrollInfo.nPos -= scrollInfo.nPage;
                     break;
                 case SB_PAGEDOWN:
-                    iVscrollPos += cyClient / cyChar;
+                    scrollInfo.nPos += scrollInfo.nPage;
+                    break;
+                case SB_THUMBTRACK:
+                    scrollInfo.nPos = scrollInfo.nTrackPos;
+                    break;
+            }
+
+            // Set the position and then retrieve it. Due to adjustments
+            // by Windows it may not be the same as the value set.
+            scrollInfo.fMask = SIF_POS;
+            SetScrollInfo(windowHandle, SB_VERT, &scrollInfo, TRUE);
+            GetScrollInfo(windowHandle, SB_VERT, &scrollInfo);
+
+            // If the position has changed, scroll the window and update it
+            if (scrollInfo.nPos != vertScrollbarPos) {
+                ScrollWindow(windowHandle, 0, charHeight * (vertScrollbarPos - scrollInfo.nPos), NULL, NULL);
+                UpdateWindow(windowHandle);
+            }
+            break;
+        case WM_HSCROLL:
+            // Get all the horizontal scrollbar information.
+            scrollInfo.cbSize = sizeof(scrollInfo);
+            scrollInfo.fMask = SIF_ALL;
+
+            GetScrollInfo(windowHandle, SB_HORZ, &scrollInfo);
+            // Save the position for comparison later on
+            horzScrollbarPos = scrollInfo.nPos;
+
+            switch (LOWORD(wParam)) {
+                case SB_LINELEFT:
+                    scrollInfo.nPos -= 1;
+                    break;
+                case SB_LINERIGHT:
+                    scrollInfo.nPos += 1;
+                    break;
+                case SB_PAGELEFT:
+                    scrollInfo.nPos -= scrollInfo.nPage;
+                    break;
+                case SB_PAGERIGHT:
+                    scrollInfo.nPos += scrollInfo.nPage;
                     break;
                 case SB_THUMBPOSITION:
-                    iVscrollPos = HIWORD(wParam);
+                    scrollInfo.nPos = scrollInfo.nTrackPos;
                     break;
                 default:
                     break;
             }
-            iVscrollPos = max(0, min(iVscrollPos, NUMLINES - 1));
-            if (iVscrollPos != GetScrollPos(hwnd, SB_VERT)) {
-                SetScrollPos(hwnd, SB_VERT, iVscrollPos, TRUE);
-                InvalidateRect(hwnd, NULL, TRUE);
+
+            scrollInfo.fMask = SIF_POS;
+            SetScrollInfo(windowHandle, SB_HORZ, &scrollInfo, TRUE);
+            GetScrollInfo(windowHandle, SB_HORZ, &scrollInfo);
+
+            if (scrollInfo.nPos != horzScrollbarPos) {
+                ScrollWindow(windowHandle, charWidth * (horzScrollbarPos - scrollInfo.nPos), 0, NULL, NULL);
             }
             break;
-        case WM_HSCROLL:
-            //TODO Implement horizontal scroll
-            break;
-        case WM_PAINT:
-            hdc = BeginPaint(hwnd, &ps);
-            for (i = 0; i < NUMLINES; i++) {
-                y = cyChar * (i - iVscrollPos);
-                TextOut(hdc, 0, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
-                TextOut(hdc, 22 * cxCaps, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
-                SetTextAlign(hdc, TA_RIGHT | TA_TOP);
-                TextOut(hdc, 22 * cxCaps + 40 * cxChar, y, szBuffer,
-                        wsprintf(szBuffer, TEXT("%5d"), GetSystemMetrics(sysmetrics[i].iIndex)));
-                SetTextAlign(hdc, TA_LEFT | TA_TOP);
+        case WM_PAINT: {
+            deviceContext = BeginPaint(windowHandle, &paintStruct);
+
+            // Get vertical scrollbar position
+            scrollInfo.cbSize = sizeof(scrollInfo);
+            scrollInfo.fMask = SIF_POS;
+            GetScrollInfo(windowHandle, SB_VERT, &scrollInfo);
+            vertScrollbarPos = scrollInfo.nPos;
+
+            // Get horizontal scrollbar position
+            GetScrollInfo(windowHandle, SB_HORZ, &scrollInfo);
+            horzScrollbarPos = scrollInfo.nPos;
+
+            // Find painting limits
+            paintBegin = max(0, vertScrollbarPos + paintStruct.rcPaint.top / charHeight);
+            paintEnd = min(NUMLINES - 1, vertScrollbarPos + paintStruct.rcPaint.bottom / charHeight);
+
+            for (i = paintBegin; i <= paintEnd; i++) {
+                x = charWidth * (1 - horzScrollbarPos);
+                y = charHeight * (i - vertScrollbarPos);
+
+                TextOut(deviceContext, x, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
+                TextOut(deviceContext, x + 22 * charWidthCaps, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
+                SetTextAlign(deviceContext, TA_RIGHT | TA_TOP);
+                TextOut(deviceContext, x + 22 * charWidthCaps + 40 * charWidth, y, buffer, wsprintf(buffer, TEXT("%5d"), GetSystemMetrics(sysmetrics[i].iIndex)));
+                SetTextAlign(deviceContext, TA_LEFT | TA_TOP);
             }
-            EndPaint(hwnd, &ps);
+            EndPaint(windowHandle, &paintStruct);
             break;
+        }
         case WM_DESTROY:
             PostQuitMessage(0);
             break;
         default:
-            return DefWindowProc(hwnd, message, wParam, lParam);
+            return DefWindowProc(windowHandle, message, wParam, lParam);
     }
     return 0;
 }
