@@ -8,7 +8,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
     MSG msg;
     WNDCLASS wndclass;
 
-    wndclass.style = CS_HREDRAW | CS_VREDRAW;
+    wndclass.style = CS_VREDRAW | CS_HREDRAW;
     wndclass.lpfnWndProc = WndProc;
     wndclass.cbClsExtra = 0;
     wndclass.cbWndExtra = 0;

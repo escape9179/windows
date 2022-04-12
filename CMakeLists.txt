@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
-project(Playground CXX)
+cmake_minimum_required(VERSION 3.21)
+project(WindowsProgramming)
 
-add_executable(Playground WIN32 main.cpp)
-target_link_libraries(Playground WINMM.LIB)
+set(CMAKE_CXX_STANDARD 14)
+
+add_executable(WindowsProgramming WIN32 main.cpp)
+target_link_libraries(WindowsProgramming WINMM.LIB)
