@@ -3,5 +3,5 @@ project(WindowsProgramming)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(WindowsProgramming WIN32 main.cpp)
+add_executable(WindowsProgramming WIN32 main.cpp Window.h)
 target_link_libraries(WindowsProgramming WINMM.LIB)
