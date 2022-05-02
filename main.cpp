@@ -1,4 +1,5 @@
 #include <windows.h>
+#include "SystemMetrics.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
@@ -62,23 +63,38 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
     HDC hdc;
     PAINTSTRUCT ps;
     RECT rect;
+    TCHAR sz_buffer[10];
     TEXTMETRIC tm;
+    static int cx_char, cx_caps, cy_char;
+    static int clientWidth;
+    static int clientHeight;
 
     switch (message) {
         case WM_CREATE:
             PlaySound(TEXT("hellowin.wav"), NULL, SND_FILENAME | SND_ASYNC);
             hdc = GetDC(hwnd);
+            TEXTMETRIC tm;
             GetTextMetrics(hdc, &tm);
-            MessageBoxPrintf(hwnd, "Text Metric Info", "Some text metrics... ascent = %li, descent: %li, height: %li, ave width: %li, max width: %li",
-                             tm.tmAscent, tm.tmDescent, tm.tmHeight, tm.tmAveCharWidth, tm.tmMaxCharWidth);
+            cx_char = tm.tmAveCharWidth;
+            cx_caps = (tm.tmPitchAndFamily & 1 ? 3 : 2) * cx_char / 2;
+            cy_char = tm.tmHeight + tm.tmExternalLeading;
             ReleaseDC(hwnd, hdc);
             return 0;
         case WM_PAINT:
             hdc = BeginPaint(hwnd, &ps);
-            GetClientRect(hwnd, &rect);
-            DrawText(hdc, TEXT("Hello, Windows 98!"), -1, &rect, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
+            for (int i = 0; i < NUMLINES; i++) {
+                TextOut(hdc, 0, cy_char * i, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
+                TextOut(hdc, 22 * cx_caps, cy_char * i, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
+                SetTextAlign(hdc, TA_RIGHT | TA_TOP);
+                TextOut(hdc, 22 * cx_caps + 40 * cx_char, cy_char * i, sz_buffer, wsprintf(sz_buffer, TEXT("%5d"),
+                                                                                           GetSystemMetrics(sysmetrics[i].iIndex)));
+                SetTextAlign(hdc, TA_LEFT | TA_TOP);
+            }
             EndPaint(hwnd, &ps);
             return 0;
+        case WM_SIZE:
+            clientWidth = HIWORD(lParam);
+            clientHeight = LOWORD(lParam);
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
