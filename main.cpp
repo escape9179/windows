@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <algorithm>
 #include "SystemMetrics.h"
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -6,39 +7,39 @@ LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 void BetterTextOut(HDC hdc, PSTR text, int x, int y);
 
 void MessageBoxPrintf(HWND hwnd, LPCSTR title, LPCSTR format, ...) {
-    va_list arg_list;
-    va_start(arg_list, format);
+    va_list argList;
+    va_start(argList, format);
     char buffer[1024];
-    wvsprintf(buffer, format, arg_list);
+    wvsprintf(buffer, format, argList);
     MessageBox(hwnd, buffer, title, MB_OK);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow) {
-    static TCHAR szAppName[] = TEXT("HelloWin");
-    HWND hwnd;
-    MSG msg;
-    WNDCLASS wndclass;
+    static TCHAR appName[] = TEXT("HelloWin");
+    HWND windowHandle;
+    MSG message;
+    WNDCLASS windowClass;
 
-    wndclass.style = CS_VREDRAW | CS_HREDRAW;
-    wndclass.lpfnWndProc = WndProc;
-    wndclass.cbClsExtra = 0;
-    wndclass.cbWndExtra = 0;
-    wndclass.hInstance = hInstance;
-    wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-    wndclass.lpszMenuName = NULL;
-    wndclass.lpszClassName = szAppName;
+    windowClass.style = CS_VREDRAW | CS_HREDRAW;
+    windowClass.lpfnWndProc = WndProc;
+    windowClass.cbClsExtra = 0;
+    windowClass.cbWndExtra = 0;
+    windowClass.hInstance = hInstance;
+    windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    windowClass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+    windowClass.lpszMenuName = NULL;
+    windowClass.lpszClassName = appName;
 
-    if (!RegisterClass(&wndclass)) {
-        MessageBox(NULL, TEXT("This program requires Windows NT!"), szAppName, MB_ICONERROR);
+    if (!RegisterClass(&windowClass)) {
+        MessageBox(NULL, TEXT("This program requires Windows NT!"), appName, MB_ICONERROR);
         return 0;
     }
 
-    hwnd = CreateWindow(
-            szAppName,
+    windowHandle = CreateWindow(
+            appName,
             TEXT("The Hello Program"),
-            WS_OVERLAPPEDWINDOW,
+            WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_HSCROLL,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
@@ -49,64 +50,82 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine,
             NULL
     );
 
-    ShowWindow(hwnd, iCmdShow);
-    UpdateWindow(hwnd);
+    ShowWindow(windowHandle, iCmdShow);
+    UpdateWindow(windowHandle);
 
-    while(GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    while(GetMessage(&message, NULL, 0, 0)) {
+        TranslateMessage(&message);
+        DispatchMessage(&message);
     }
-    return msg.wParam;
+    return message.wParam;
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    HDC hdc;
-    PAINTSTRUCT ps;
-    RECT rect;
-    TCHAR sz_buffer[10];
-    TEXTMETRIC tm;
-    static int cx_char, cx_caps, cy_char;
+    HDC deviceContext;
+    PAINTSTRUCT paintStruct;
+    RECT rectangle;
+    TCHAR charBuffer[10];
+    TEXTMETRIC textMetric;
+    static int charWidth, capsWidth, charHeight;
     static int clientWidth;
     static int clientHeight;
+    static int vertScrollBarPos;
 
     switch (message) {
         case WM_CREATE:
             PlaySound(TEXT("hellowin.wav"), NULL, SND_FILENAME | SND_ASYNC);
-            hdc = GetDC(hwnd);
+            deviceContext = GetDC(hwnd);
             TEXTMETRIC tm;
-            GetTextMetrics(hdc, &tm);
-            cx_char = tm.tmAveCharWidth;
-            cx_caps = (tm.tmPitchAndFamily & 1 ? 3 : 2) * cx_char / 2;
-            cy_char = tm.tmHeight + tm.tmExternalLeading;
-            ReleaseDC(hwnd, hdc);
+            GetTextMetrics(deviceContext, &tm);
+            charWidth = tm.tmAveCharWidth;
+            capsWidth = (tm.tmPitchAndFamily & 1 ? 3 : 2) * charWidth / 2;
+            charHeight = tm.tmHeight + tm.tmExternalLeading;
+            ReleaseDC(hwnd, deviceContext);
+            SetScrollRange(hwnd, SB_VERT, 0, NUMLINES - 1, FALSE);
+            SetScrollPos(hwnd, SB_VERT, vertScrollBarPos, FALSE);
             return 0;
         case WM_PAINT:
-            hdc = BeginPaint(hwnd, &ps);
+            deviceContext = BeginPaint(hwnd, &paintStruct);
             for (int i = 0; i < NUMLINES; i++) {
-                TextOut(hdc, 0, cy_char * i, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
-                TextOut(hdc, 22 * cx_caps, cy_char * i, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
-                SetTextAlign(hdc, TA_RIGHT | TA_TOP);
-                TextOut(hdc, 22 * cx_caps + 40 * cx_char, cy_char * i, sz_buffer, wsprintf(sz_buffer, TEXT("%5d"),
-                                                                                           GetSystemMetrics(sysmetrics[i].iIndex)));
-                SetTextAlign(hdc, TA_LEFT | TA_TOP);
+                int y = charHeight * (i - vertScrollBarPos);
+                TextOut(deviceContext, 0, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
+                TextOut(deviceContext, 22 * capsWidth, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
+                SetTextAlign(deviceContext, TA_RIGHT | TA_TOP);
+                TextOut(deviceContext, 22 * capsWidth + 40 * charWidth, y, charBuffer, wsprintf(charBuffer, TEXT("%5d"),
+                                                                                                             GetSystemMetrics(sysmetrics[i].iIndex)));
+                SetTextAlign(deviceContext, TA_LEFT | TA_TOP);
             }
-            EndPaint(hwnd, &ps);
+            EndPaint(hwnd, &paintStruct);
+            return 0;
+        case WM_VSCROLL:
+            switch(LOWORD(wParam)) {
+                case SB_LINEUP:
+                    vertScrollBarPos -= 1;
+                    break;
+                case SB_LINEDOWN:
+                    vertScrollBarPos += 1;
+                    break;
+                case SB_PAGEUP:
+                    vertScrollBarPos -= clientHeight / charHeight;
+                    break;
+                case SB_PAGEDOWN:
+                    vertScrollBarPos += clientHeight / charHeight;
+                case SB_THUMBPOSITION:
+                    vertScrollBarPos = HIWORD(wParam);
+            }
+            vertScrollBarPos = std::max(0, std::min(vertScrollBarPos, NUMLINES - 1));
+            if(vertScrollBarPos != GetScrollPos(hwnd, SB_VERT)) {
+                SetScrollPos(hwnd, SB_VERT, vertScrollBarPos, FALSE);
+                InvalidateRect(hwnd, NULL, TRUE);
+            }
             return 0;
         case WM_SIZE:
             clientWidth = HIWORD(lParam);
             clientHeight = LOWORD(lParam);
+            return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
     }
     return DefWindowProc(hwnd, message, wParam, lParam);
-}
-
-void BetterTextOut(HDC hdc, PSTR text, int x, int y) {
-    int count = 0;
-    for (int i = 0; ; i++) {
-        if (text[i] != '\0') count++;
-        else break;
-    }
-    TextOut(hdc, x, y, text, sizeof(char) * count);
 }
