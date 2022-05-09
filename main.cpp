@@ -1,4 +1,4 @@
-#include <windows.h>
+#include <Windows.h>
 #include <algorithm>
 #include "SystemMetrics.h"
 
@@ -66,10 +66,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
     RECT rectangle;
     TCHAR charBuffer[10];
     TEXTMETRIC textMetric;
+    SCROLLINFO scrollInfo;
     static int charWidth, capsWidth, charHeight;
     static int clientWidth;
     static int clientHeight;
     static int vertScrollBarPos;
+    static int verticalScrollMax;
 
     switch (message) {
         case WM_CREATE:
@@ -81,8 +83,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             capsWidth = (tm.tmPitchAndFamily & 1 ? 3 : 2) * charWidth / 2;
             charHeight = tm.tmHeight + tm.tmExternalLeading;
             ReleaseDC(hwnd, deviceContext);
-            SetScrollRange(hwnd, SB_VERT, 0, NUMLINES - 1, FALSE);
-            SetScrollPos(hwnd, SB_VERT, vertScrollBarPos, FALSE);
+
+            // Get scroll bar position.
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_POS;
+            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
+            vertScrollBarPos = scrollInfo.nPos;
             return 0;
         case WM_PAINT:
             deviceContext = BeginPaint(hwnd, &paintStruct);
@@ -113,15 +119,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
                 case SB_THUMBPOSITION:
                     vertScrollBarPos = HIWORD(wParam);
             }
-            vertScrollBarPos = std::max(0, std::min(vertScrollBarPos, NUMLINES - 1));
-            if(vertScrollBarPos != GetScrollPos(hwnd, SB_VERT)) {
-                SetScrollPos(hwnd, SB_VERT, vertScrollBarPos, FALSE);
+            vertScrollBarPos = max(0, min(vertScrollBarPos, verticalScrollMax));
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_POS;
+            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
+            if(vertScrollBarPos != scrollInfo.nPos) {
+                scrollInfo.nPos = vertScrollBarPos;
+                SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
                 InvalidateRect(hwnd, NULL, TRUE);
             }
             return 0;
         case WM_SIZE:
-            clientWidth = HIWORD(lParam);
-            clientHeight = LOWORD(lParam);
+            clientWidth = LOWORD(lParam);
+            clientHeight = HIWORD(lParam);
+            verticalScrollMax = NUMLINES - 1 - (clientHeight / charHeight);
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_RANGE | SIF_PAGE;
+            scrollInfo.nMin = 0;
+            scrollInfo.nMax = NUMLINES - 1;
+            scrollInfo.nPage = clientHeight / charHeight;
+            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
