@@ -70,7 +70,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
     static int charWidth, capsWidth, charHeight;
     static int clientWidth;
     static int clientHeight;
-    static int vertScrollBarPos;
+    static int prevVertScrollBarPos;
     static int verticalScrollMax;
 
     switch (message) {
@@ -83,17 +83,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             capsWidth = (tm.tmPitchAndFamily & 1 ? 3 : 2) * charWidth / 2;
             charHeight = tm.tmHeight + tm.tmExternalLeading;
             ReleaseDC(hwnd, deviceContext);
-
-            // Get scroll bar position.
-            scrollInfo.cbSize = sizeof(SCROLLINFO);
-            scrollInfo.fMask = SIF_POS;
-            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
-            vertScrollBarPos = scrollInfo.nPos;
             return 0;
         case WM_PAINT:
+            scrollInfo.fMask = SIF_POS;
+            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
             deviceContext = BeginPaint(hwnd, &paintStruct);
             for (int i = 0; i < NUMLINES; i++) {
-                int y = charHeight * (i - vertScrollBarPos);
+                int y = charHeight * (i - scrollInfo.nPos);
                 TextOut(deviceContext, 0, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
                 TextOut(deviceContext, 22 * capsWidth, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
                 SetTextAlign(deviceContext, TA_RIGHT | TA_TOP);
@@ -104,30 +100,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             EndPaint(hwnd, &paintStruct);
             return 0;
         case WM_VSCROLL:
-            switch(LOWORD(wParam)) {
-                case SB_LINEUP:
-                    vertScrollBarPos -= 1;
-                    break;
-                case SB_LINEDOWN:
-                    vertScrollBarPos += 1;
-                    break;
-                case SB_PAGEUP:
-                    vertScrollBarPos -= clientHeight / charHeight;
-                    break;
-                case SB_PAGEDOWN:
-                    vertScrollBarPos += clientHeight / charHeight;
-                case SB_THUMBPOSITION:
-                    vertScrollBarPos = HIWORD(wParam);
-            }
-            vertScrollBarPos = max(0, min(vertScrollBarPos, verticalScrollMax));
-            scrollInfo.cbSize = sizeof(SCROLLINFO);
             scrollInfo.fMask = SIF_POS;
             GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
-            if(vertScrollBarPos != scrollInfo.nPos) {
-                scrollInfo.nPos = vertScrollBarPos;
-                SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
-                InvalidateRect(hwnd, NULL, TRUE);
+            prevVertScrollBarPos = scrollInfo.nPos;
+            switch(LOWORD(wParam)) {
+                case SB_LINEUP:
+                    scrollInfo.nPos -= 1;
+                    break;
+                case SB_LINEDOWN:
+                    scrollInfo.nPos += 1;
+                    break;
+                case SB_PAGEUP:
+                    scrollInfo.nPos -= clientHeight / charHeight;
+                    break;
+                case SB_PAGEDOWN:
+                    scrollInfo.nPos += clientHeight / charHeight;
+                case SB_THUMBTRACK:
+                    scrollInfo.nPos = HIWORD(wParam);
             }
+            scrollInfo.cbSize = sizeof(SCROLLINFO);
+            scrollInfo.fMask = SIF_POS;
+            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
+            ScrollWindow(hwnd, 0, charHeight * (scrollInfo.nPos - prevVertScrollBarPos), NULL, NULL);
+            InvalidateRect(hwnd, NULL, TRUE);
             return 0;
         case WM_SIZE:
             clientWidth = LOWORD(lParam);
@@ -138,7 +133,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             scrollInfo.nMin = 0;
             scrollInfo.nMax = NUMLINES - 1;
             scrollInfo.nPage = clientHeight / charHeight;
-            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
+            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, TRUE);
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
