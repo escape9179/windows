@@ -121,8 +121,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) 
             scrollInfo.cbSize = sizeof(SCROLLINFO);
             scrollInfo.fMask = SIF_POS;
             SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
-            ScrollWindow(hwnd, 0, charHeight * (scrollInfo.nPos - prevVertScrollBarPos), NULL, NULL);
-            InvalidateRect(hwnd, NULL, TRUE);
+            ScrollWindow(hwnd, 0, charHeight * (prevVertScrollBarPos - scrollInfo.nPos), NULL, NULL);
+            UpdateWindow(hwnd);
             return 0;
         case WM_SIZE:
             clientWidth = LOWORD(lParam);
