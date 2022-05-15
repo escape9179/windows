@@ -1,143 +1,72 @@
 #include <Windows.h>
-#include <algorithm>
-#include "SystemMetrics.h"
+#include <math.h>
+
+#define NUM 1000
+#define TWOPI (2 * 3.14159)
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
 
-void BetterTextOut(HDC hdc, PSTR text, int x, int y);
-
-void MessageBoxPrintf(HWND hwnd, LPCSTR title, LPCSTR format, ...) {
-    va_list argList;
-    va_start(argList, format);
-    char buffer[1024];
-    wvsprintf(buffer, format, argList);
-    MessageBox(hwnd, buffer, title, MB_OK);
-}
-
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int iCmdShow) {
-    static TCHAR appName[] = TEXT("HelloWin");
-    HWND windowHandle;
-    MSG message;
-    WNDCLASS windowClass;
+    static TCHAR szAppName[] = TEXT("SineWave");
+    HWND hwnd;
+    MSG msg;
+    WNDCLASS wndclass;
 
-    windowClass.style = CS_VREDRAW | CS_HREDRAW;
-    windowClass.lpfnWndProc = WndProc;
-    windowClass.cbClsExtra = 0;
-    windowClass.cbWndExtra = 0;
-    windowClass.hInstance = hInstance;
-    windowClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    windowClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    windowClass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
-    windowClass.lpszMenuName = NULL;
-    windowClass.lpszClassName = appName;
+    wndclass.style = CS_HREDRAW | CS_VREDRAW;
+    wndclass.lpfnWndProc = WndProc;
+    wndclass.cbClsExtra = 0;
+    wndclass.cbWndExtra = 0;
+    wndclass.hInstance = hInstance;
+    wndclass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wndclass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wndclass.hbrBackground = (HBRUSH) GetStockObject(WHITE_BRUSH);
+    wndclass.lpszMenuName = NULL;
+    wndclass.lpszClassName = szAppName;
 
-    if (!RegisterClass(&windowClass)) {
-        MessageBox(NULL, TEXT("This program requires Windows NT!"), appName, MB_ICONERROR);
+    if (!RegisterClass(&wndclass)) {
+        MessageBox(NULL, TEXT("Program requires Windows NT!"), szAppName, MB_ICONERROR);
         return 0;
     }
 
-    windowHandle = CreateWindow(
-            appName,
-            TEXT("The Hello Program"),
-            WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_HSCROLL,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            NULL,
-            NULL,
-            hInstance,
-            NULL
-    );
+    hwnd = CreateWindow(szAppName, TEXT("Sine Wave Using Polyline"), WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                        CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, hInstance, NULL);
+    ShowWindow(hwnd, iCmdShow);
+    UpdateWindow(hwnd);
 
-    ShowWindow(windowHandle, iCmdShow);
-    UpdateWindow(windowHandle);
-
-    while(GetMessage(&message, NULL, 0, 0)) {
-        TranslateMessage(&message);
-        DispatchMessage(&message);
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
-    return message.wParam;
+    return msg.wParam;
 }
 
-LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    HDC deviceContext;
-    PAINTSTRUCT paintStruct;
-    RECT rectangle;
-    TCHAR charBuffer[10];
-    TEXTMETRIC textMetric;
-    SCROLLINFO scrollInfo;
-    static int charWidth, capsWidth, charHeight;
-    static int clientWidth;
-    static int clientHeight;
-    static int prevVertScrollBarPos;
-    static int verticalScrollMax;
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lparam) {
+    static int cyClient, cxClient;
+    HDC hdc;
+    int i;
+    PAINTSTRUCT ps;
+    POINT apt[NUM];
 
     switch (message) {
-        case WM_CREATE:
-            PlaySound(TEXT("hellowin.wav"), NULL, SND_FILENAME | SND_ASYNC);
-            deviceContext = GetDC(hwnd);
-            TEXTMETRIC tm;
-            GetTextMetrics(deviceContext, &tm);
-            charWidth = tm.tmAveCharWidth;
-            capsWidth = (tm.tmPitchAndFamily & 1 ? 3 : 2) * charWidth / 2;
-            charHeight = tm.tmHeight + tm.tmExternalLeading;
-            ReleaseDC(hwnd, deviceContext);
+        case WM_SIZE:
+            cxClient = LOWORD(lparam);
+            cyClient = HIWORD(lparam);
             return 0;
         case WM_PAINT:
-            scrollInfo.fMask = SIF_POS;
-            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
-            deviceContext = BeginPaint(hwnd, &paintStruct);
-            for (int i = 0; i < NUMLINES; i++) {
-                int y = charHeight * (i - scrollInfo.nPos);
-                TextOut(deviceContext, 0, y, sysmetrics[i].szLabel, lstrlen(sysmetrics[i].szLabel));
-                TextOut(deviceContext, 22 * capsWidth, y, sysmetrics[i].szDesc, lstrlen(sysmetrics[i].szDesc));
-                SetTextAlign(deviceContext, TA_RIGHT | TA_TOP);
-                TextOut(deviceContext, 22 * capsWidth + 40 * charWidth, y, charBuffer, wsprintf(charBuffer, TEXT("%5d"),
-                                                                                                             GetSystemMetrics(sysmetrics[i].iIndex)));
-                SetTextAlign(deviceContext, TA_LEFT | TA_TOP);
+            hdc = BeginPaint(hwnd, &ps);
+
+            MoveToEx(hdc, 0, cyClient / 2, NULL);
+            LineTo(hdc, cxClient, cyClient / 2);
+
+            for (i = 0; i < NUM; i++) {
+                apt[i].x = i * cxClient / NUM;
+                apt[i].y = (int) (cyClient / 2 * (1 - sin(TWOPI * i / NUM)));
             }
-            EndPaint(hwnd, &paintStruct);
-            return 0;
-        case WM_VSCROLL:
-            scrollInfo.fMask = SIF_POS;
-            GetScrollInfo(hwnd, SB_VERT, &scrollInfo);
-            prevVertScrollBarPos = scrollInfo.nPos;
-            switch(LOWORD(wParam)) {
-                case SB_LINEUP:
-                    scrollInfo.nPos -= 1;
-                    break;
-                case SB_LINEDOWN:
-                    scrollInfo.nPos += 1;
-                    break;
-                case SB_PAGEUP:
-                    scrollInfo.nPos -= clientHeight / charHeight;
-                    break;
-                case SB_PAGEDOWN:
-                    scrollInfo.nPos += clientHeight / charHeight;
-                case SB_THUMBTRACK:
-                    scrollInfo.nPos = HIWORD(wParam);
-            }
-            scrollInfo.cbSize = sizeof(SCROLLINFO);
-            scrollInfo.fMask = SIF_POS;
-            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, FALSE);
-            ScrollWindow(hwnd, 0, charHeight * (prevVertScrollBarPos - scrollInfo.nPos), NULL, NULL);
-            UpdateWindow(hwnd);
-            return 0;
-        case WM_SIZE:
-            clientWidth = LOWORD(lParam);
-            clientHeight = HIWORD(lParam);
-            verticalScrollMax = NUMLINES - 1 - (clientHeight / charHeight);
-            scrollInfo.cbSize = sizeof(SCROLLINFO);
-            scrollInfo.fMask = SIF_RANGE | SIF_PAGE;
-            scrollInfo.nMin = 0;
-            scrollInfo.nMax = NUMLINES - 1;
-            scrollInfo.nPage = clientHeight / charHeight;
-            SetScrollInfo(hwnd, SB_VERT, &scrollInfo, TRUE);
+            Polyline(hdc, apt, NUM);
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
     }
-    return DefWindowProc(hwnd, message, wParam, lParam);
+    return DefWindowProc(hwnd, message, wParam, lparam);
 }
